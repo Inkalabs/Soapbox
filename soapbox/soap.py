@@ -206,13 +206,8 @@ class Stub(object):
 
 
 def get_django_dispatch(service):
-    '''
-    '''
 
     def call_the_method(request, message, soap_action):
-        '''
-        '''
-        from . import xsd
 
         for method in service.methods:
             if soap_action != method.soapAction:
@@ -220,24 +215,19 @@ def get_django_dispatch(service):
 
             if isinstance(method.input, basestring):
                 element = service.schema.elements[method.input]
-                # 28/01/2013 SGC
-                if service.schema.elementFormDefault == xsd.ElementFormDefault.QUALIFIED:
-                    input_object = element._type.parsexml(message, service.schema)
-                else:
-                    input_object = element._type.parsexml(message)
+                input_object = element._type.parsexml(message)
             else:
-                # 28/01/2013 SGC
-                if service.schema.elementFormDefault == xsd.ElementFormDefault.QUALIFIED:
-                    input_object = method.input.parsexml(message, service.schema)
-                else:
-                    input_object = method.input.parsexml(message)
-
+                input_object = method.input.parsexml(message, service.schema)
             return_object = method.function(request, input_object)
+
             try:
                 tagname = uncapitalize(return_object.__class__.__name__)
-                return_object.xml(tagname, namespace=service.schema.targetNamespace,
-                                  elementFormDefault=service.schema.elementFormDefault,
-                                  schema=service.schema)  # Validation.
+                return_object.xml(
+                    tagname, namespace=service.schema.targetNamespace,
+                    elementFormDefault=service.schema.elementFormDefault,
+                    schema=service.schema)
+            except XMLSyntaxError:
+                pass
             except Exception, e:
                 raise ValueError(e)
 
@@ -248,31 +238,28 @@ def get_django_dispatch(service):
             return tagname, return_object
         raise ValueError('Method not found!')
 
-
     def django_dispatch(request):
-        '''
-        '''
-        import django
+
         from django.http import HttpResponse
-        from . import py2wsdl
+        from soapbox import py2wsdl
 
         SOAP = service.version
 
         if request.method == 'GET' and 'wsdl' in request.GET:
             wsdl = py2wsdl.generate_wsdl(service)
-            wsdl = etree.tostring(wsdl, encoding='utf-8', pretty_print=True,
+            wsdl = etree.tostring(
+                wsdl, encoding='utf-8', pretty_print=True,
                 xml_declaration=True)
-            return HttpResponse(wsdl, mimetype='text/xml')
+
+            return HttpResponse(wsdl, content_type='text/xml')
 
         try:
-            if django.VERSION < (1, 4):
-                xml = request.raw_post_data
-            else:
-                xml = request.body
+            xml = request.body
             envelope = SOAP.Envelope.parsexml(xml)
             message = envelope.Body.content()
             soap_action = SOAP.determin_soap_action(request)
-            tagname, return_object = call_the_method(request, message, soap_action)
+            tagname, return_object = call_the_method(
+                request, message, soap_action)
             soap_message = SOAP.Envelope.response(tagname, return_object)
             return HttpResponse(soap_message, content_type=SOAP.CONTENT_TYPE)
         except (ValueError, etree.XMLSyntaxError) as e:
@@ -282,7 +269,6 @@ def get_django_dispatch(service):
         return HttpResponse(response, content_type=SOAP.CONTENT_TYPE)
 
     return django_dispatch
-
 
 ################################################################################
 # vim:et:ft=python:nowrap:sts=4:sw=4:ts=4
