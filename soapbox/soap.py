@@ -226,7 +226,7 @@ def get_django_dispatch(service):
                     tagname, namespace=service.schema.targetNamespace,
                     elementFormDefault=service.schema.elementFormDefault,
                     schema=service.schema)
-            except XMLSyntaxError:
+            except etree.XMLSyntaxError:
                 pass
             except Exception, e:
                 raise ValueError(e)
